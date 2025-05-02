@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Opportunity Wall</title>
+  <!-- Poppins Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Boxicons -->
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+  <style>
+    body { font-family: 'Poppins', sans-serif; background: #f5f5f5; }
+    .sticky-header { position: sticky; top: 0; z-index: 20; background: #171e71; height: 48px; }
+    .page-header { background: #fff; padding: .75rem 1rem; margin-top: .5rem; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .breadcrumb { --bs-breadcrumb-divider: '>'; padding: 0; margin: 0; background: transparent; font-size: 14px; }
+    .breadcrumb a { color: #495057; text-decoration: none; }
+    .breadcrumb .active { color: #343a40; }
+    .filters-bar { background: #fff; padding: .75rem 1rem; margin: 1rem 0; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; align-items: center; gap: .75rem; }
+    .filters-bar .form-select, .filters-bar .form-control { height: calc(1.5rem + 1rem); font-size: 14px; }
+    .card { position: relative; border-radius: 8px; border: 1px solid #e0e0e0; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: transform .2s, box-shadow .2s; cursor: pointer; }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .card-body { padding: 1.5rem 1rem 1rem !important; }
+    .accent-high { border-left: 4px solid #dc3545 !important; }
+    .accent-medium { border-left: 4px solid #ffc107 !important; }
+    .accent-low { border-left: 4px solid #198754 !important; }
+    .card-title { font-size: 1rem; font-weight: 600; color: #343a40; margin-top: 0.2rem; margin-bottom: .5rem; }
+    .card-kpi { font-size: 1rem; font-weight: 600; color: #343a40; margin-bottom: .5rem; }
+    .card-text { font-size: 0.875rem; color: #6c757d; }
+    .badge-priority { position: absolute; top: 0.75rem; right: 0.75rem; z-index: 2; font-size: 0.65rem; padding: 0.25em 0.5em; }
+    .btn-primary { background: #171e71; border: none; }
+    .btn-primary:hover { background: #0f154e; }
+    .btn-outline-secondary { color: #171e71; border-color: #171e71; }
+    .btn-outline-secondary:hover { background: rgba(23,30,113,0.1); }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="sticky-header d-flex align-items-center px-3">
+        <i class="bx bx-cog fs-4 text-white ms-auto" @click="editorVisible = !editorVisible" title="Edit baseCardData" style="cursor:pointer;"></i>
+      </div>
+    <div class="container py-4">
+      <div class="page-header d-flex justify-content-between align-items-center">
+        <nav aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="#">Adloop</a></li><li class="breadcrumb-item active" aria-current="page">Opportunity Wall</li></ol></nav>
+        <div class="text-muted">{{ (sortedCards || []).length }} opportunité(s)</div>
+      </div>
+      <!-- JSON Editor -->
+      <div v-if="editorVisible" class="mb-4">
+        <textarea v-model="rawJson" @input="applyJson" class="form-control" style="height:200px; font-family:monospace;" placeholder="Coller votre baseCardData ici..."></textarea>
+      </div>
+      <div class="filters-bar">
+        <input type="text" class="form-control form-control-sm" v-model="filters.search" placeholder="Search...">
+        <select class="form-select form-select-sm" v-model="filters.priority">
+          <option value="all">Priority: All</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+        <select class="form-select form-select-sm" v-model="filters.metric">
+          <option value="all">Metric: All</option>
+          <option value="roas">ROAS</option>
+          <option value="cpc">CPC</option>
+          <option value="cpa">CPA</option>
+          <option value="ltv">LTV</option>
+          <option value="ebitda">EBITDA</option>
+        </select>
+        <select class="form-select form-select-sm" v-model="sortKey">
+          <option value="none">Sort</option>
+          <option value="title-asc">Title A–Z</option>
+          <option value="title-desc">Title Z–A</option>
+          <option value="kpi-desc">KPI ↓</option>
+          <option value="kpi-asc">KPI ↑</option>
+        </select>
+      </div>
+      <div class="row g-4">
+        <div class="col-12 col-sm-6 col-md-4 col-xl-3" v-for="card in sortedCards" :key="card.id">
+          <div :class="['card h-100', accentClass(card.priority)]" tabindex="0" @click="openDetail(card)">
+            <span class="badge badge-priority" :class="badgeClass(card.priority)">{{ badgeText(card.priority) }}</span>
+            <div class="card-body">
+              <div class="d-flex align-items-center mb-2">
+                <i :class="['bx', card.icon, 'fs-3', priorityColor(card.priority), 'me-2']"></i>
+                <div class="card-title text-truncate" :title="card.title">{{ card.title }}</div>
+              </div>
+              <div class="card-kpi">{{ card.kpi }}</div>
+              <div class="card-text small">{{ card.text }}</div>
+            </div>
+            <div class="p-3 pt-0 d-flex justify-content-end">
+              <button v-if="card.priority==='high'" class="btn btn-sm btn-danger me-2">Pause</button>
+              <button v-else-if="card.priority==='low'" class="btn btn-sm btn-success me-2">Scale</button>
+              <button class="btn btn-sm btn-outline-secondary">Détails</button>
+            </div>
+          </div>
+        </div>
+        <div v-if="!sortedCards.length" class="col-12 text-center text-muted">Aucune opportunité trouvée. <button class="btn btn-link" @click="resetFilters">Réinitialiser</button></div>
+      </div>
+      <!-- Detail Offcanvas -->
+      <div class="offcanvas offcanvas-end" tabindex="-1" id="detailPanel">
+        <div class="offcanvas-header bg-light">
+          <i :class="['bx', detailCard.icon, 'fs-3', priorityColor(detailCard.priority), 'me-2']"></i>
+          <h5 class="offcanvas-title">{{ detailCard.title }} <span class="badge" :class="badgeClass(detailCard.priority)">{{ badgeText(detailCard.priority) }}</span></h5>
+          <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body">
+          <p><strong>KPI :</strong> {{ detailCard.kpi }}</p>
+          <p class="mb-3"><strong>Pourquoi c'est important ?</strong><br>{{ detailCard.detailText }}</p>
+          <canvas id="detailChart" width="300" height="160"></canvas>
+          <p><strong>Actions recommandées :</strong></p><ol><li v-for="(step,i) in detailCard.steps" :key="i">{{ step }}</li></ol>
+          <div class="d-flex gap-2 mb-3"><a :href="detailCard.actionUrl" target="_blank" class="btn btn-primary">Appliquer</a><a :href="detailCard.reportUrl" class="btn btn-outline-primary">Rapport</a></div>
+          <p class="text-muted small"><em>Généré le {{ new Date().toLocaleDateString() }}</em> – <a href="#" class="small">Signaler faux positif</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const { createApp, nextTick } = Vue;
+    const defaultBase = [ /* default cards here */ ];
+    createApp({
+      data() {
+        return {
+          filters: { priority: 'all', metric: 'all', search: '' },
+          sortKey: 'none', editorVisible: false, rawJson: '', cards: [], detailCard: {}
+        };
+      },
+      created() {
+        const saved = localStorage.getItem('baseCardData');
+        this.rawJson = saved || JSON.stringify(defaultBase, null, 2);
+        this.applyJson();
+      },
+      methods: {
+        applyJson() {
+          try {
+            const arr = JSON.parse(this.rawJson);
+            if (Array.isArray(arr)) this.cards = arr;
+          } catch (e) {
+            try {
+              const arr = eval('(' + this.rawJson + ')');
+              if (Array.isArray(arr)) this.cards = arr;
+            } catch {}
+          }
+          localStorage.setItem('baseCardData', this.rawJson);
+        },
+        resetFilters() {
+          this.filters = { environment: 'all', status: 'active', sources: 'all', search: '' };
+          this.sortKey = 'none';
+        },
+        priorityColor(p) {
+          return p === 'high' ? 'text-danger' : p === 'medium' ? 'text-warning' : 'text-success';
+        },
+        accentClass(p) {
+          return p === 'high' ? 'accent-high' : p === 'medium' ? 'accent-medium' : 'accent-low';
+        },
+        badgeText(p) {
+          return p === 'high' ? 'High' : p === 'medium' ? 'Med' : 'Low';
+        },
+        badgeClass(p) {
+          return p === 'high' ? 'bg-danger' : p === 'medium' ? 'bg-warning text-dark' : 'bg-success';
+        },
+        openDetail(card) {
+          this.detailCard = { ...card };
+          const panel = document.getElementById('detailPanel');
+          if (panel) {
+            const off = new bootstrap.Offcanvas(panel);
+            off.show();
+            nextTick(() => {
+              const ctx = document.getElementById('detailChart');
+              if (this.detailCard.chart && ctx) {
+                new Chart(ctx, {
+                  type: this.detailCard.chart.type,
+                  data: {
+                    labels: this.detailCard.chart.labels,
+                    datasets: [{ data: this.detailCard.chart.series, borderColor: '#0d6efd', fill: false }]
+                  },
+                  options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
+                });
+              }
+            });
+          }
+        }
+      },
+      computed: {
+        filteredCards() {
+          return (this.cards || []).filter(c =>
+            (this.filters.search === '' || c.title.toLowerCase().includes(this.filters.search.toLowerCase())) &&
+            (this.filters.priority === 'all' || c.priority === this.filters.priority) &&
+            (this.filters.metric === 'all' || c.metric === this.filters.metric)
+          );
+        },
+        sortedCards() {
+          let arr = this.filteredCards.slice();
+          if (this.sortKey === 'title-asc') arr.sort((a, b) => a.title.localeCompare(b.title));
+          else if (this.sortKey === 'title-desc') arr.sort((a, b) => b.title.localeCompare(a.title));
+          return arr;
+        }
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
